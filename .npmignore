@@ -1,0 +1,8 @@
+node_modules/
+example/
+exmple.github/
+.github/
+.vscode/
+*.log
+bun.lock
+tsconfig.json

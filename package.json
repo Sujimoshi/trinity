@@ -1,0 +1,49 @@
+{
+  "name": "trinity-mcp",
+  "version": "0.1.0",
+  "description": "A Bun-based MCP server framework with dynamic tool loading, hot reload, and stdio/HTTP modes",
+  "type": "module",
+  "license": "MIT",
+  "author": "Igor Solomakha",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sujimoshi/trinity.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "bun",
+    "tools",
+    "hot-reload",
+    "ai",
+    "llm"
+  ],
+  "bin": {
+    "trinity": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "bun --watch src/index.ts --target ./example",
+    "start:http": "MCP_MODE=http bun --hot src/index.ts --target ./example"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "json-stringify-safe": "^5.0.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.8",
+    "@types/json-stringify-safe": "^5.0.3"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

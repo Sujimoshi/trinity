@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "trinity": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["--watch", "src/index.ts", "--target", "./example"]
+    }
+  }
+}

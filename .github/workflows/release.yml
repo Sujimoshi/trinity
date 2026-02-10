@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+      - next
+      - alpha
+      - beta
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Semantic Release
+        uses: Sujimoshi/semantic-release-action@v1.8.0
+        id: release
+        with:
+          branches: |
+            +([0-9])?(.{+([0-9]),x}).x
+            main
+            next
+            next-major
+            { "name": "alpha", "prerelease": true }
+            { "name": "beta", "prerelease": true }
+
+      - name: Release Info
+        if: steps.release.outputs.version != ''
+        run: |
+          echo "Version: ${{ steps.release.outputs.version }}"
+          echo "Tag: ${{ steps.release.outputs.tag }}"
+          echo "Type: ${{ steps.release.outputs.type }}"
+          echo "Channel: ${{ steps.release.outputs.channel }}"
+
+      - name: Publish to npm
+        if: steps.release.outputs.version != ''
+        run: |
+          npm version ${{ steps.release.outputs.version }} --no-git-tag-version --allow-same-version
+          bun publish --access public --tolerate-republish
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.release.outputs.version != ''
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
+          body: ${{ steps.release.outputs.notes }}
+          draft: false
+          prerelease: ${{ !!steps.release.outputs.channel }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
