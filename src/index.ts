@@ -9,8 +9,10 @@ const logger = new Logger("main");
 try {
   Config.getInstance().parse(process.argv.slice(2));
 } catch (err) {
-  console.error((err as Error).message);
-  console.error("Usage: bun --hot src/index.ts --target <path> [--glob <pattern>] [--port <number>]");
+  logger.error((err as Error).message);
+  logger.error(
+    "Usage: bun --hot src/index.ts --target <path> [--glob <pattern>] [--port <number>]",
+  );
   process.exit(1);
 }
 

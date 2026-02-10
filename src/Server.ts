@@ -51,6 +51,8 @@ export class Server {
       port: this.config.port,
     });
 
+    await this.tools.loadTools();
+
     this.tools.startWatching();
 
     const transport = await this.createTransport();

@@ -47,6 +47,8 @@ export class Tools {
       }
     }
 
+    this.logger.debug(`Loaded ${tools.length} tools successfully`);
+
     return tools;
   }
 
