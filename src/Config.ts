@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 
 export class Config {
   private static instance: Config | null = null;
@@ -50,12 +51,17 @@ export class Config {
 
     if (!this._targetFolder) {
       throw new Error(
-        "Missing required argument: --target <path>. Specify the folder containing tool files."
+        "Missing required argument: --target <path>. Specify the folder containing tool files.",
       );
     }
 
     // Resolve to absolute path
     this._targetFolder = path.resolve(this._targetFolder);
+
+    // Create target folder if it doesn't exist
+    if (!fs.existsSync(this._targetFolder)) {
+      fs.mkdirSync(this._targetFolder, { recursive: true });
+    }
 
     // Default log file relative to target folder
     if (!this._logFile) {

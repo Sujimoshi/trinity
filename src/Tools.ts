@@ -27,7 +27,7 @@ export class Tools {
 
   private constructor(
     private logger = new Logger(Tools),
-    private config = Config.getInstance()
+    private config = Config.getInstance(),
   ) {}
 
   async loadTools(): Promise<ToolDefinition[]> {
@@ -40,8 +40,10 @@ export class Tools {
       try {
         const tool = await this.loadToolFromFile(filePath);
         tools.push(tool);
-      } catch (err) {
-        this.logger.error(`Failed to load tool from ${filePath}`, err as Error);
+      } catch (err: any) {
+        this.logger.error(`Failed to load tool from ${filePath}`, {
+          err: err.message,
+        });
       }
     }
 
@@ -51,7 +53,7 @@ export class Tools {
   async loadTool(name: string): Promise<ToolDefinition> {
     const files = await this.resolveToolFiles();
     const filePath = files.find(
-      (f) => path.basename(f, path.extname(f)) === name
+      (f) => path.basename(f, path.extname(f)) === name,
     );
 
     if (!filePath) {
@@ -76,7 +78,7 @@ export class Tools {
         if (filename) {
           this.onFileChange(event, filename);
         }
-      }
+      },
     );
 
     this.watcher.on("error", (err: Error) => {
@@ -110,19 +112,19 @@ export class Tools {
 
     if (!mod.description || typeof mod.description !== "string") {
       throw new Error(
-        `Tool file ${filePath} must export a 'description' string`
+        `Tool file ${filePath} must export a 'description' string`,
       );
     }
 
     if (!mod.inputSchema || typeof mod.inputSchema !== "object") {
       throw new Error(
-        `Tool file ${filePath} must export an 'inputSchema' object`
+        `Tool file ${filePath} must export an 'inputSchema' object`,
       );
     }
 
     if (!mod.default || typeof mod.default !== "function") {
       throw new Error(
-        `Tool file ${filePath} must have a default export function (execute)`
+        `Tool file ${filePath} must have a default export function (execute)`,
       );
     }
 
@@ -134,9 +136,20 @@ export class Tools {
     };
   }
 
-  private async dynamicImport(filePath: string): Promise<Record<string, unknown>> {
-    // Cache-busting with timestamp to always get fresh module
-    return import(`${filePath}?t=${Date.now()}`);
+  private async dynamicImport(
+    filePath: string,
+  ): Promise<Record<string, unknown>> {
+    try {
+      // Cache-busting with timestamp to always get fresh module
+      return import(`${filePath}?t=${Date.now()}`);
+    } catch (err) {
+      this.logger.error(`Failed to import tool module`, {
+        err: (err as Error).message,
+        filePath,
+      });
+
+      throw err;
+    }
   }
 
   private buildDescription(description: string, filePath: string): string {
