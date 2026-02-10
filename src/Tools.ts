@@ -35,25 +35,18 @@ export class Tools {
     this.logger.debug("Resolved tool files", { count: files.length });
 
     // Load all tools in parallel
-    const toolPromises = files.map((filePath) =>
-      this.loadToolFromFile(filePath),
-    );
-    const results = await Promise.allSettled(toolPromises);
-
-    const tools: ToolDefinition[] = [];
-
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        tools.push(result.value);
-      } else {
-        this.logger.error(`Failed to load tool`, {
-          file: files[index],
-          err: result.reason?.message || result.reason,
+    const toolPromises = files.map(async (filePath) => {
+      return this.loadToolFromFile(filePath).catch((err) => {
+        this.logger.error("Failed to load tool from file", {
+          file: filePath,
+          err: (err as Error).message,
         });
-      }
+      });
     });
 
-    return tools;
+    const results = await Promise.all(toolPromises);
+
+    return results.filter(Boolean) as ToolDefinition[];
   }
 
   async loadTool(name: string): Promise<ToolDefinition> {

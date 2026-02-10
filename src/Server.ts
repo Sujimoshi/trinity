@@ -126,10 +126,6 @@ export class Server {
     const toolDefs = await this.tools.loadTools();
 
     const tools = toolDefs.map((tool) => {
-      this.logger.debug(`Generated JSON schema for tool`, {
-        name: tool.name,
-      });
-
       return {
         name: tool.name,
         description: tool.description,
