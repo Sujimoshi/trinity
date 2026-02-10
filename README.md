@@ -67,21 +67,6 @@ Add to `.vscode/mcp.json`:
 }
 ```
 
-## Claude Desktop Integration
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "my-tools": {
-      "command": "bunx",
-      "args": ["@isolo/trinity", "--target", "./tools"]
-    }
-  }
-}
-```
-
 ## Tool Structure
 
 Every tool is a `.ts` file with three exports:
