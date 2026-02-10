@@ -32,22 +32,26 @@ export class Tools {
 
   async loadTools(): Promise<ToolDefinition[]> {
     const files = await this.resolveToolFiles();
-    this.logger.debug(`Resolved ${files.length} tool files`);
+    this.logger.debug("Resolved tool files", { count: files.length });
+
+    // Load all tools in parallel
+    const toolPromises = files.map((filePath) =>
+      this.loadToolFromFile(filePath),
+    );
+    const results = await Promise.allSettled(toolPromises);
 
     const tools: ToolDefinition[] = [];
 
-    for (const filePath of files) {
-      try {
-        const tool = await this.loadToolFromFile(filePath);
-        tools.push(tool);
-      } catch (err: any) {
-        this.logger.error(`Failed to load tool from ${filePath}`, {
-          err: err.message,
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        tools.push(result.value);
+      } else {
+        this.logger.error(`Failed to load tool`, {
+          file: files[index],
+          err: result.reason?.message || result.reason,
         });
       }
-    }
-
-    this.logger.debug(`Loaded ${tools.length} tools successfully`);
+    });
 
     return tools;
   }
@@ -71,7 +75,7 @@ export class Tools {
 
   startWatching(): void {
     const targetFolder = this.config.targetFolder;
-    this.logger.info(`Watching for changes in ${targetFolder}`);
+    this.logger.info("Watching for changes", { targetFolder });
 
     this.watcher = fs.watch(
       targetFolder,
@@ -171,7 +175,7 @@ export class Tools {
       return;
     }
 
-    this.logger.info(`File ${event}: ${filename}`);
+    this.logger.info("File changed", { event, filename });
 
     if (this.onChangeCallback) {
       this.onChangeCallback();

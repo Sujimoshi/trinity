@@ -13,6 +13,7 @@ import { Config } from "./Config.js";
 import { Logger } from "./Logger.js";
 import { Tools } from "./Tools.js";
 import safeJsonStringify from "json-stringify-safe";
+import { ZodType } from "zod";
 
 export class Server {
   private static instance: Server | null = null;
@@ -90,32 +91,53 @@ export class Server {
     );
   }
 
+  safeZodToJson(schema: ZodType) {
+    try {
+      // Validate it's a proper Zod schema
+      if (!schema || typeof schema !== "object" || !("_zod" in schema)) {
+        this.logger.error("Invalid Zod schema: missing _zod property", {
+          schemaType: typeof schema,
+          hasZodProp: schema ? "_zod" in schema : false,
+        });
+        return {
+          type: "object",
+          properties: {},
+          description: "Invalid Zod schema: not a valid Zod schema object",
+        };
+      }
+      return schema.toJSONSchema();
+    } catch (err) {
+      this.logger.error("Failed to convert Zod schema to JSON Schema", {
+        error: (err as Error).message,
+        stack: (err as Error).stack,
+      });
+      return {
+        type: "object",
+        properties: {},
+        description:
+          "Failed to convert zod schema to JSON Schema, pls check your zod schema maybe it have some problems",
+      };
+    }
+  }
+
   private async handleListTools() {
     this.logger.debug("Handling list_tools request");
 
     const toolDefs = await this.tools.loadTools();
 
     const tools = toolDefs.map((tool) => {
-      // Convert Zod schema to JSON Schema for the MCP protocol
-      const jsonSchema = tool.inputSchema.toJSONSchema();
-
       this.logger.debug(`Generated JSON schema for tool`, {
         name: tool.name,
-        jsonSchema,
       });
 
       return {
         name: tool.name,
         description: tool.description,
-        inputSchema: jsonSchema as {
-          type: "object";
-          properties?: Record<string, unknown>;
-          required?: string[];
-        },
+        inputSchema: this.safeZodToJson(tool.inputSchema),
       };
     });
 
-    this.logger.debug(`Returning ${tools.length} tools`);
+    this.logger.debug("Returning tools", { count: tools.length });
     return { tools };
   }
 
@@ -123,16 +145,16 @@ export class Server {
     params: { name: string; arguments?: Record<string, unknown> };
   }) {
     const { name, arguments: args } = request.params;
-    this.logger.info(`Calling tool: ${name}`);
+    this.logger.info("Calling tool", { name });
 
     try {
       const tool = await this.tools.loadTool(name);
       const raw = await tool.execute(args || {});
-      this.logger.debug(`Tool ${name} executed successfully`, { raw });
+      this.logger.debug("Tool executed successfully", { name, raw });
 
       return this.formatToolResult(raw);
     } catch (err) {
-      this.logger.error(`Tool ${name} execution failed`, err as Error);
+      this.logger.error("Tool execution failed", { name, error: err as Error });
       return {
         content: [
           {
@@ -187,7 +209,7 @@ export class Server {
       return new StdioServerTransport();
     }
 
-    this.logger.info(`Starting HTTP server on port ${this.config.port}`);
+    this.logger.info("Starting HTTP server", { port: this.config.port });
     return this.createHttpTransport();
   }
 
@@ -219,7 +241,7 @@ export class Server {
       },
     });
 
-    this.logger.info(`HTTP server listening on port ${this.config.port}`);
+    this.logger.info("HTTP server listening", { port: this.config.port });
     return transport;
   }
 
@@ -236,13 +258,13 @@ export class Server {
       },
     ];
 
-    this.logger.debug(`Returning ${resources.length} resources`);
+    this.logger.debug("Returning resources", { count: resources.length });
     return { resources };
   }
 
   private async handleReadResource(request: { params: { uri: string } }) {
     const { uri } = request.params;
-    this.logger.info(`Reading resource: ${uri}`);
+    this.logger.info("Reading resource", { uri });
 
     if (uri === "trinity://docs/tools") {
       try {
@@ -259,7 +281,10 @@ export class Server {
           ],
         };
       } catch (err) {
-        this.logger.error(`Failed to read resource ${uri}`, err as Error);
+        this.logger.error("Failed to read resource", {
+          uri,
+          error: err as Error,
+        });
         throw new Error(`Failed to read resource: ${(err as Error).message}`);
       }
     }
