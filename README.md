@@ -19,7 +19,7 @@ A lightweight [MCP](https://modelcontextprotocol.io/) server framework for [Bun]
 ### Install
 
 ```bash
-bun add trinity-mcp
+bun add @isolo/trinity
 ```
 
 ### Create a tool
@@ -45,10 +45,10 @@ export default async ({ name }: z.infer<typeof inputSchema>) => {
 
 ```bash
 # Stdio mode (for VS Code, Claude Desktop, etc.)
-bunx trinity-mcp --target ./tools
+bunx @isolo/trinity --target ./tools
 
 # HTTP mode
-MCP_MODE=http bunx trinity-mcp --target ./tools --port 3000
+MCP_MODE=http bunx @isolo/trinity --target ./tools --port 3000
 ```
 
 ## VS Code Integration
@@ -61,9 +61,9 @@ Add to `.vscode/mcp.json`:
     "my-tools": {
       "type": "stdio",
       "command": "bunx",
-      "args": ["trinity-mcp", "--target", "./tools"]
-    }
-  }
+      "args": ["@isolo/trinity", "--target", "./tools"],
+    },
+  },
 }
 ```
 
@@ -76,7 +76,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "my-tools": {
       "command": "bunx",
-      "args": ["trinity-mcp", "--target", "./tools"]
+      "args": ["@isolo/trinity", "--target", "./tools"]
     }
   }
 }
@@ -86,24 +86,24 @@ Add to `claude_desktop_config.json`:
 
 Every tool is a `.ts` file with three exports:
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `description` | `string` | What the tool does (shown to LLM) |
-| `inputSchema` | `z.object(...)` | Zod schema for input validation |
-| `default` | `async (args) => any` | The function that runs when the tool is called |
+| Export        | Type                  | Description                                    |
+| ------------- | --------------------- | ---------------------------------------------- |
+| `description` | `string`              | What the tool does (shown to LLM)              |
+| `inputSchema` | `z.object(...)`       | Zod schema for input validation                |
+| `default`     | `async (args) => any` | The function that runs when the tool is called |
 
 ### Return Values
 
 Just return what makes sense — Trinity converts it to MCP format automatically:
 
-| You return | MCP result |
-|-----------|-----------|
-| `string` | Text content |
-| `number` / `boolean` | Text content (stringified) |
-| `object` | Text + structured content |
-| `array` | Multiple content items |
-| `{ isError: true, error: "..." }` | Error response |
-| `throw new Error(...)` | Error response |
+| You return                        | MCP result                 |
+| --------------------------------- | -------------------------- |
+| `string`                          | Text content               |
+| `number` / `boolean`              | Text content (stringified) |
+| `object`                          | Text + structured content  |
+| `array`                           | Multiple content items     |
+| `{ isError: true, error: "..." }` | Error response             |
+| `throw new Error(...)`            | Error response             |
 
 ## Examples
 
@@ -122,9 +122,12 @@ export const inputSchema = z.object({
 
 export default async ({ operation, a, b }: z.infer<typeof inputSchema>) => {
   switch (operation) {
-    case "add": return a + b;
-    case "subtract": return a - b;
-    case "multiply": return a * b;
+    case "add":
+      return a + b;
+    case "subtract":
+      return a - b;
+    case "multiply":
+      return a * b;
     case "divide":
       if (b === 0) return { isError: true, error: "Division by zero" };
       return a / b;
@@ -156,13 +159,13 @@ export default async ({ location }: z.infer<typeof inputSchema>) => {
 
 ## CLI Options
 
-| Option | Env Variable | Default | Description |
-|--------|-------------|---------|-------------|
-| `--target <path>` | — | *required* | Folder containing tool files |
-| `--glob <pattern>` | `MCP_GLOB` | `**/*.ts` | Glob pattern for tool discovery |
-| `--port <number>` | — | `3000` | HTTP server port |
-| — | `MCP_MODE` | `stdio` | Transport mode: `stdio` or `http` |
-| — | `LOG_FILE` | `<target>/debug.log` | Log file path |
+| Option             | Env Variable | Default              | Description                       |
+| ------------------ | ------------ | -------------------- | --------------------------------- |
+| `--target <path>`  | —            | _required_           | Folder containing tool files      |
+| `--glob <pattern>` | `MCP_GLOB`   | `**/*.ts`            | Glob pattern for tool discovery   |
+| `--port <number>`  | —            | `3000`               | HTTP server port                  |
+| —                  | `MCP_MODE`   | `stdio`              | Transport mode: `stdio` or `http` |
+| —                  | `LOG_FILE`   | `<target>/debug.log` | Log file path                     |
 
 ## Development
 

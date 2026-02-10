@@ -1,5 +1,5 @@
 {
-  "name": "trinity-mcp",
+  "name": "@isolo/trinity",
   "version": "0.1.0",
   "description": "A Bun-based MCP server framework with dynamic tool loading, hot reload, and stdio/HTTP modes",
   "type": "module",
