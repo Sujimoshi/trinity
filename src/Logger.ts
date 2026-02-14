@@ -8,8 +8,10 @@ export class Logger {
   private name: string;
   private config: Config;
   private logQueue: string[] = [];
-  private flushTimer: Timer | null = null;
+  private flushTimer: NodeJS.Timeout | null = null;
   private isWriting = false;
+  private static readonly MAX_QUEUE_SIZE = 1000;
+  private static readonly FLUSH_INTERVAL_MS = 100;
 
   constructor(requester: string | { name: string }) {
     this.name = typeof requester === "string" ? requester : requester.name;
@@ -56,9 +58,16 @@ export class Logger {
   private queueLog(message: string): void {
     this.logQueue.push(message);
     
-    // Schedule flush if not already scheduled
-    if (!this.flushTimer) {
-      this.flushTimer = setTimeout(() => this.flushLogs(), 100);
+    // If queue is getting too large, flush immediately
+    if (this.logQueue.length >= Logger.MAX_QUEUE_SIZE) {
+      if (this.flushTimer) {
+        clearTimeout(this.flushTimer);
+        this.flushTimer = null;
+      }
+      this.flushLogs();
+    } else if (!this.flushTimer) {
+      // Schedule flush if not already scheduled
+      this.flushTimer = setTimeout(() => this.flushLogs(), Logger.FLUSH_INTERVAL_MS);
     }
   }
 
@@ -83,8 +92,9 @@ export class Logger {
       this.isWriting = false;
       
       // If more logs were queued while writing, schedule another flush
+      // Use non-recursive approach: schedule a new timer instead of calling directly
       if (this.logQueue.length > 0 && !this.flushTimer) {
-        this.flushTimer = setTimeout(() => this.flushLogs(), 100);
+        this.flushTimer = setTimeout(() => this.flushLogs(), Logger.FLUSH_INTERVAL_MS);
       }
     }
   }
