@@ -35,6 +35,8 @@ export class Server {
     },
   );
 
+  private schemaCache: WeakMap<ZodType, any> = new WeakMap();
+
   private constructor(
     private logger = new Logger(Server),
     private config = Config.getInstance(),
@@ -92,6 +94,12 @@ export class Server {
   }
 
   safeZodToJson(schema: ZodType) {
+    // Check cache first
+    if (this.schemaCache.has(schema)) {
+      return this.schemaCache.get(schema);
+    }
+
+    let result;
     try {
       // Validate it's a proper Zod schema
       if (!schema || typeof schema !== "object" || !("_zod" in schema)) {
@@ -99,25 +107,30 @@ export class Server {
           schemaType: typeof schema,
           hasZodProp: schema ? "_zod" in schema : false,
         });
-        return {
+        result = {
           type: "object",
           properties: {},
           description: "Invalid Zod schema: not a valid Zod schema object",
         };
+      } else {
+        result = schema.toJSONSchema();
       }
-      return schema.toJSONSchema();
     } catch (err) {
       this.logger.error("Failed to convert Zod schema to JSON Schema", {
         error: (err as Error).message,
         stack: (err as Error).stack,
       });
-      return {
+      result = {
         type: "object",
         properties: {},
         description:
           "Failed to convert zod schema to JSON Schema, pls check your zod schema maybe it have some problems",
       };
     }
+
+    // Cache the result
+    this.schemaCache.set(schema, result);
+    return result;
   }
 
   private async handleListTools() {
@@ -290,6 +303,8 @@ export class Server {
 
   private onToolsChanged(): void {
     this.logger.info("Tools changed, notifying clients");
+    // Clear schema cache when tools change
+    this.schemaCache = new WeakMap();
     this.server.sendToolListChanged().catch((err: Error) => {
       this.logger.error("Failed to send tool list changed notification", err);
     });

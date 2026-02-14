@@ -7,6 +7,9 @@ type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG";
 export class Logger {
   private name: string;
   private config: Config;
+  private logQueue: string[] = [];
+  private flushTimer: Timer | null = null;
+  private isWriting = false;
 
   constructor(requester: string | { name: string }) {
     this.name = typeof requester === "string" ? requester : requester.name;
@@ -46,7 +49,43 @@ export class Logger {
     if (this.config.logDest === "stdout") {
       console.error(formatted);
     } else {
-      fs.appendFileSync(this.config.logFile, formatted + "\n");
+      this.queueLog(formatted);
+    }
+  }
+
+  private queueLog(message: string): void {
+    this.logQueue.push(message);
+    
+    // Schedule flush if not already scheduled
+    if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => this.flushLogs(), 100);
+    }
+  }
+
+  private async flushLogs(): Promise<void> {
+    this.flushTimer = null;
+    
+    if (this.isWriting || this.logQueue.length === 0) {
+      return;
+    }
+
+    this.isWriting = true;
+    const logsToWrite = this.logQueue.splice(0);
+    const content = logsToWrite.join("\n") + "\n";
+
+    try {
+      await fs.promises.appendFile(this.config.logFile, content);
+    } catch (err) {
+      // Fallback to console if file write fails
+      console.error("Failed to write to log file:", err);
+      console.error(content);
+    } finally {
+      this.isWriting = false;
+      
+      // If more logs were queued while writing, schedule another flush
+      if (this.logQueue.length > 0 && !this.flushTimer) {
+        this.flushTimer = setTimeout(() => this.flushLogs(), 100);
+      }
     }
   }
 }

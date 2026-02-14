@@ -24,15 +24,31 @@ export class Tools {
 
   private watcher: fs.FSWatcher | null = null;
   private onChangeCallback: (() => void) | null = null;
+  private globPattern: Glob;
+  private toolCache: Map<string, ToolDefinition> = new Map();
+  private toolPathMap: Map<string, string> = new Map();
+  private cacheValid = false;
 
   private constructor(
     private logger = new Logger(Tools),
     private config = Config.getInstance(),
-  ) {}
+  ) {
+    this.globPattern = new Glob(this.config.glob);
+  }
 
   async loadTools(): Promise<ToolDefinition[]> {
+    // Return cached tools if cache is valid
+    if (this.cacheValid && this.toolCache.size > 0) {
+      this.logger.debug("Returning cached tools", { count: this.toolCache.size });
+      return Array.from(this.toolCache.values());
+    }
+
     const files = await this.resolveToolFiles();
     this.logger.debug("Resolved tool files", { count: files.length });
+
+    // Clear caches
+    this.toolCache.clear();
+    this.toolPathMap.clear();
 
     // Load all tools in parallel
     const toolPromises = files.map(async (filePath) => {
@@ -45,21 +61,45 @@ export class Tools {
     });
 
     const results = await Promise.all(toolPromises);
+    const tools = results.filter(Boolean) as ToolDefinition[];
 
-    return results.filter(Boolean) as ToolDefinition[];
+    // Cache the results
+    for (const tool of tools) {
+      this.toolCache.set(tool.name, tool);
+    }
+
+    this.cacheValid = true;
+    return tools;
   }
 
   async loadTool(name: string): Promise<ToolDefinition> {
-    const files = await this.resolveToolFiles();
-    const filePath = files.find(
-      (f) => path.basename(f, path.extname(f)) === name,
-    );
-
-    if (!filePath) {
-      throw new Error(`Tool not found: ${name}`);
+    // Check cache first
+    if (this.cacheValid && this.toolCache.has(name)) {
+      this.logger.debug("Returning cached tool", { name });
+      return this.toolCache.get(name)!;
     }
 
-    return this.loadToolFromFile(filePath);
+    // If not cached, look up the file path
+    let filePath = this.toolPathMap.get(name);
+    
+    if (!filePath) {
+      // Need to scan files to find the tool
+      const files = await this.resolveToolFiles();
+      filePath = files.find(
+        (f) => path.basename(f, path.extname(f)) === name,
+      );
+
+      if (!filePath) {
+        throw new Error(`Tool not found: ${name}`);
+      }
+
+      // Cache the path mapping
+      this.toolPathMap.set(name, filePath);
+    }
+
+    const tool = await this.loadToolFromFile(filePath);
+    this.toolCache.set(name, tool);
+    return tool;
   }
 
   onChange(callback: () => void): void {
@@ -80,6 +120,7 @@ export class Tools {
       },
     );
 
+    // Attach error handler immediately to avoid race condition
     this.watcher.on("error", (err: Error) => {
       this.logger.error("Watcher error", err);
     });
@@ -94,11 +135,10 @@ export class Tools {
   }
 
   private async resolveToolFiles(): Promise<string[]> {
-    const glob = new Glob(this.config.glob);
     const targetFolder = this.config.targetFolder;
     const files: string[] = [];
 
-    for await (const file of glob.scan({ cwd: targetFolder, absolute: true })) {
+    for await (const file of this.globPattern.scan({ cwd: targetFolder, absolute: true })) {
       files.push(file);
     }
 
@@ -126,6 +166,9 @@ export class Tools {
         `Tool file ${filePath} must have a default export function (execute)`,
       );
     }
+
+    // Cache the path mapping
+    this.toolPathMap.set(name, filePath);
 
     return {
       name,
@@ -162,13 +205,15 @@ export class Tools {
   }
 
   private onFileChange(event: string, filename: string): void {
-    // Check if the changed file matches our glob pattern
-    const glob = new Glob(this.config.glob);
-    if (!glob.match(filename)) {
+    // Check if the changed file matches our glob pattern (use cached glob)
+    if (!this.globPattern.match(filename)) {
       return;
     }
 
     this.logger.info("File changed", { event, filename });
+
+    // Invalidate cache when files change
+    this.cacheValid = false;
 
     if (this.onChangeCallback) {
       this.onChangeCallback();
